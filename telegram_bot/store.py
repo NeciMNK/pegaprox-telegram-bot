@@ -67,6 +67,13 @@ class Store:
                 rec['notify'] = bool(on)
                 self._write()
 
+    def set_lang(self, tg_id, lang):
+        with self._lock:
+            rec = self._data.get(str(tg_id))
+            if rec:
+                rec['lang'] = lang
+                self._write()
+
     def unseen(self, tg_id, keys):
         """The alert ids not sent to this user yet."""
         with self._lock:
@@ -96,5 +103,5 @@ class Store:
     def accounts(self):
         """[(telegram id, info)] for the settings page; never the tokens."""
         with self._lock:
-            return [(int(k), dict(rec.get('info') or {}), bool(rec.get('notify', True)))
+            return [(int(k), dict(rec.get('info') or {}), bool(rec.get('notify', True)), rec.get('lang') or '')
                     for k, rec in self._data.items()]

@@ -17,7 +17,7 @@
   p.hint { color:var(--muted); margin:2px 0 0; font-size:13px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; max-width:760px; }
   label { display:block; font-weight:600; margin-top:12px; }
-  input { width:100%; padding:7px 9px; margin-top:4px; border:1px solid var(--line); border-radius:6px;
+  input, select { width:100%; padding:7px 9px; margin-top:4px; border:1px solid var(--line); border-radius:6px;
           background:var(--bg); color:var(--fg); font:inherit; }
   button { margin-top:14px; margin-right:8px; padding:7px 14px; border-radius:6px; border:1px solid var(--line);
            background:var(--bg); color:var(--fg); font:inherit; cursor:pointer; }
@@ -48,6 +48,10 @@
   <label for="poll">Alert check interval, seconds</label>
   <input id="poll" type="number" min="0" max="86400">
   <p class="hint">0 turns alert messages off. Otherwise 15 or more.</p>
+
+  <label for="language">Default language</label>
+  <select id="language"></select>
+  <p class="hint">For users who did not pick one with /lang.</p>
 
   <label for="proxy">Proxy for api.telegram.org</label>
   <input id="proxy" placeholder="empty, or http://host:port, socks5h://host:port">
@@ -113,18 +117,27 @@
     $('ids').value = (s.allowed_ids || []).join(', ');
     $('poll').value = s.alert_poll;
     $('proxy').value = s.proxy || '';
+    var sel = $('language');
+    sel.textContent = '';
+    Object.keys(s.languages || { en: 'English' }).forEach(function (code) {
+      var o = document.createElement('option');
+      o.value = code;
+      o.textContent = s.languages[code];
+      sel.appendChild(o);
+    });
+    sel.value = s.language || 'en';
 
     var box = $('accounts');
     box.textContent = '';
     if (!s.accounts.length) { box.textContent = 'Nobody has linked an account yet.'; return; }
     var table = document.createElement('table');
     var head = table.insertRow();
-    ['Telegram id', 'Telegram name', 'PegaProx role', 'Alerts', ''].forEach(function (h) {
+    ['Telegram id', 'Telegram name', 'PegaProx role', 'Alerts', 'Language', ''].forEach(function (h) {
       var th = document.createElement('th'); th.textContent = h; head.appendChild(th);
     });
     s.accounts.forEach(function (a) {
       var row = table.insertRow();
-      [String(a.tg_id), a.tg_name, a.role, a.notify ? 'on' : 'off'].forEach(function (v) {
+      [String(a.tg_id), a.tg_name, a.role, a.notify ? 'on' : 'off', a.lang || 'default'].forEach(function (v) {
         row.insertCell().textContent = v;
       });
       var btn = document.createElement('button');
@@ -146,7 +159,8 @@
   }
 
   $('save').onclick = function () {
-    var body = { allowed_ids: $('ids').value, alert_poll: Number($('poll').value || 0), proxy: $('proxy').value };
+    var body = { allowed_ids: $('ids').value, alert_poll: Number($('poll').value || 0), proxy: $('proxy').value,
+                 language: $('language').value };
     if ($('token').value.trim()) body.bot_token = $('token').value.trim();
     say('Saving…', true);
     api('settings/update', body).then(function () {

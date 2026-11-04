@@ -30,6 +30,8 @@ for _name in [n for n in sys.modules if n.startswith(__name__ + '.')]:
     del sys.modules[_name]
 
 from .bot import Bot, COMMANDS  # noqa: E402
+from .i18n import LANGUAGES  # noqa: E402
+from .lang_ru import RU  # noqa: E402
 from .pegaprox_client import InProcess, PegaProx  # noqa: E402
 from .store import Store  # noqa: E402
 from .telegram import Telegram  # noqa: E402
@@ -39,7 +41,7 @@ log = logging.getLogger('plugin.telegram_bot')
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 BOT_TOKEN_RE = re.compile(r'^\d{5,15}:[A-Za-z0-9_-]{30,64}$')
 PROXY_RE = re.compile(r'^(https?|socks5h?)://[^\s/?#]+/?$')
-DEFAULTS = {'bot_token': '', 'allowed_ids': [], 'alert_poll': 60, 'proxy': ''}
+DEFAULTS = {'bot_token': '', 'allowed_ids': [], 'alert_poll': 60, 'proxy': '', 'language': 'en'}
 
 _SELF = sys.modules.get(__name__)
 _app = None
@@ -112,6 +114,7 @@ class Settings:
     def __init__(self, s):
         self.allowed_ids = set(s.get('allowed_ids') or [])
         self.alert_poll = int(s.get('alert_poll') or 0)
+        self.language = s.get('language') if s.get('language') in LANGUAGES else 'en'
 
 
 # ------------------------------------------------------------------ routes
@@ -143,9 +146,11 @@ def route_settings():
         'allowed_ids': sorted(s['allowed_ids']),
         'alert_poll': s['alert_poll'],
         'proxy': s['proxy'],
+        'language': s['language'],
+        'languages': LANGUAGES,
         'status': dict(_status, running=bool(_thread and _thread.is_alive() and _status['running'])),
         'accounts': [{'tg_id': tid, 'tg_name': info.get('tg_name') or '', 'role': info.get('role') or '',
-                      'notify': notify} for tid, info, notify in store().accounts()],
+                      'notify': notify, 'lang': lang} for tid, info, notify, lang in store().accounts()],
     }
 
 
@@ -182,6 +187,11 @@ def route_update():
                     raise ValueError('alert_poll is 0 (off) or 15 to 86400 seconds')
                 s['alert_poll'] = poll
                 changed.append('alert_poll')
+            if 'language' in body:
+                if body['language'] not in LANGUAGES:
+                    raise ValueError('language is one of: ' + ', '.join(LANGUAGES))
+                s['language'] = body['language']
+                changed.append('language')
             if 'proxy' in body:
                 proxy = str(body['proxy'] or '').strip()
                 if proxy and not PROXY_RE.match(proxy):
@@ -301,6 +311,8 @@ def _loop():
             me = tg.call('getMe')
             _status['bot_username'] = (me or {}).get('username', '')
             tg.set_commands(COMMANDS)
+            # Telegram shows these to users whose app is in Russian
+            tg.set_commands([(c, RU.get(d, d)) for c, d in COMMANDS], language_code='ru')
         bot.cfg = Settings(s)
         try:
             updates = tg.updates(offset, timeout=25)

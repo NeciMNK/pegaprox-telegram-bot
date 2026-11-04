@@ -27,6 +27,8 @@ TLS certificate or extra service to set up.
 - PegaProx users (`/users`): list, create, change role, enable and disable, set a new password,
   reset 2FA, delete. Needs the `admin.users` permission, and PegaProx's own limits apply as in
   the web UI. Works only in a private chat; password messages are deleted right away.
+- English and Russian: `/lang en|ru` (or the 🌐 button) per user; the default is set on the
+  settings page.
 - `/api METHOD /api/path [JSON]`: any PegaProx API call when the buttons are not enough
   (private chat only).
 
@@ -56,6 +58,7 @@ already ships with.
 |---|---|---|
 | Bot token | | from @BotFather; stored encrypted with PegaProx's own key, never shown again |
 | Allowed Telegram user ids | empty | when set, the bot ignores everyone else |
+| Default language | English | for users who did not pick one with `/lang` |
 | Alert check interval | 60 | seconds between checks for new alerts, `0` turns alert messages off |
 | Proxy | empty | `http://host:port` or `socks5h://host:port` if the host reaches Telegram only through a proxy (SOCKS needs the `PySocks` package) |
 
@@ -88,6 +91,13 @@ or the user loses a permission, the bot loses it at once, since PegaProx checks 
 - The settings page and its API are for PegaProx admins only (the token's effective role counts,
   so an admin's viewer-scoped token is not enough).
 
+## Translations
+
+The English text in the code is the key; `telegram_bot/lang_ru.py` maps it to Russian. To add a
+language, add a `lang_<code>.py` with the same keys and list it in `telegram_bot/i18n.py`.
+`tests/test_telegram_bot_lang.py` checks that every text has a translation with the same
+placeholders and HTML tags.
+
 ## Development and tests
 
 The tests run inside a PegaProx checkout, against the real PegaProx app:
@@ -97,7 +107,7 @@ git clone -b Testing https://github.com/PegaProx/project-pegaprox.git pegaprox
 cp -r telegram_bot pegaprox/plugins/
 cp tests/*.py pegaprox/tests/
 cd pegaprox && pip install -r requirements.txt -r requirements-dev.txt
-python -m pytest tests/test_tgbot.py tests/test_tgbot_users.py tests/test_tgbot_against_pegaprox.py tests/test_telegram_bot_plugin.py
+python -m pytest tests/test_tgbot.py tests/test_tgbot_users.py tests/test_tgbot_against_pegaprox.py tests/test_telegram_bot_plugin.py tests/test_telegram_bot_lang.py
 ```
 
 GitHub Actions does the same on every push (`.github/workflows/tests.yml`).

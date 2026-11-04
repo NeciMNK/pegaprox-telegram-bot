@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Text formatting for the bot's screens (Russian)."""
+"""Text formatting for the bot's screens."""
 import html
 from datetime import datetime
+
+from .i18n import _
 
 STATUS_ICON = {'running': '🟢', 'stopped': '🔴', 'paused': '🟡', 'suspended': '🟡'}
 TYPE_LABEL = {'qemu': 'VM', 'lxc': 'CT'}
@@ -38,7 +40,7 @@ def uptime(sec):
     d, rem = divmod(sec, 86400)
     h, rem = divmod(rem, 3600)
     m = rem // 60
-    return f'{d}d {h}h' if d else f'{h}h {m}m'
+    return _('{d}d {h}h', d=d, h=h) if d else _('{h}h {m}m', h=h, m=m)
 
 
 def when(ts):
@@ -66,25 +68,32 @@ def node_line(n):
     name = n.get('node') or n.get('name')
     cpu = n.get('cpu')
     cpu_s = f'{float(cpu) * 100:.0f}%' if isinstance(cpu, (int, float)) else '?'
-    return (f"{icon} <b>{e(name)}</b>  CPU {cpu_s}, RAM {pct(n.get('mem'), n.get('maxmem'))}"
-            f" ({size(n.get('mem'))} of {size(n.get('maxmem'))})")
+    return (f"{icon} <b>{e(name)}</b>  CPU {cpu_s}, RAM {pct(n.get('mem'), n.get('maxmem'))} ("
+            + _('{used} of {total}', used=size(n.get('mem')), total=size(n.get('maxmem'))) + ')')
+
+
+def used_of(s):
+    """'10.0 GB of 100.0 GB (10%)' for a storage entry."""
+    return (_('{used} of {total}', used=size(s.get('used')), total=size(s.get('total')))
+            + f" ({pct(s.get('used'), s.get('total'))})")
 
 
 def node_text(n):
     name = n.get('node') or n.get('name')
-    lines = [f"🖥 Node <b>{e(name)}</b>",
-             f"Status: {e(n.get('status', '?'))}"]
+    lines = [_('🖥 Node <b>{node}</b>', node=e(name)),
+             _('Status: {status}', status=e(n.get('status', '?')))]
     if n.get('status') == 'online':
         cpu = n.get('cpu')
         if isinstance(cpu, (int, float)):
-            lines.append(f"CPU: {float(cpu) * 100:.0f}% of {e(n.get('maxcpu', '?'))} cores")
-        lines.append(f"RAM: {size(n.get('mem'))} of {size(n.get('maxmem'))} ({pct(n.get('mem'), n.get('maxmem'))})")
+            lines.append(_('CPU: {pct} of {cores} cores', pct=f'{float(cpu) * 100:.0f}%', cores=e(n.get('maxcpu', '?'))))
+        lines.append('RAM: ' + _('{used} of {total}', used=size(n.get('mem')), total=size(n.get('maxmem')))
+                     + f" ({pct(n.get('mem'), n.get('maxmem'))})")
         if n.get('maxdisk'):
-            lines.append(f"Disk: {size(n.get('disk'))} of {size(n.get('maxdisk'))}")
+            lines.append(_('Disk: {used} of {total}', used=size(n.get('disk')), total=size(n.get('maxdisk'))))
         if n.get('uptime'):
-            lines.append(f"Uptime: {uptime(n.get('uptime'))}")
+            lines.append(_('Uptime: {time}', time=uptime(n.get('uptime'))))
     if n.get('maintenance_mode') or n.get('maintenance'):
-        lines.append('🛠 In maintenance')
+        lines.append(_('🛠 In maintenance'))
     return '\n'.join(lines)
 
 
@@ -96,7 +105,8 @@ def guest_button(v):
 def guest_text(v, cname):
     icon = STATUS_ICON.get(v.get('status'), '⚪')
     return (f"{icon} <b>{e(v.get('name') or '')}</b> ({TYPE_LABEL.get(v.get('type'), e(v.get('type')))} {e(v.get('vmid'))})\n"
-            f"Cluster: {e(cname)}\nNode: {e(v.get('node'))}\nState: {e(v.get('status', '?'))}")
+            + _('Cluster: {cluster}\nNode: {node}\nState: {state}',
+                cluster=e(cname), node=e(v.get('node')), state=e(v.get('status', '?'))))
 
 
 def task_line(t):
@@ -105,24 +115,25 @@ def task_line(t):
     icon = '✅' if ok else ('⏳' if not t.get('endtime') else '❌')
     target = t.get('id') or ''
     return (f"{icon} {when(t.get('starttime'))} <b>{e(t.get('type', '?'))}</b> {e(target)} "
-            f"on {e(t.get('node', '?'))} ({e(t.get('user', ''))}){'' if ok else ': ' + e(status)}")
+            + _('on {node}', node=e(t.get('node', '?')))
+            + f" ({e(t.get('user', ''))}){'' if ok else ': ' + e(status)}")
 
 
 def alert_text(a, cname=None):
     icon = SEV_ICON.get((a.get('severity') or '').lower(), '⚠️')
-    lines = [f"{icon} <b>{e(a.get('message') or a.get('metric') or 'Alert')}</b>"]
+    lines = [f"{icon} <b>{e(a.get('message') or a.get('metric') or _('Alert'))}</b>"]
     if cname:
-        lines.append(f"Cluster: {e(cname)}")
+        lines.append(_('Cluster: {cluster}', cluster=e(cname)))
     target = ' '.join(x for x in (a.get('target_type'), a.get('target_name')) if x)
     if target:
-        lines.append(f"Target: {e(target)}")
+        lines.append(_('Target: {target}', target=e(target)))
     if a.get('metric'):
         val = a.get('current_value')
         thr = a.get('threshold')
-        lines.append(f"{e(a.get('metric'))}: {e(val)}" + (f" (threshold {e(a.get('operator') or '')} {e(thr)})" if thr not in (None, '') else ''))
-    lines.append(f"Since {when(a.get('triggered_at'))}")
+        lines.append(f"{e(a.get('metric'))}: {e(val)}" + (' ' + _('(threshold {op} {value})', op=e(a.get('operator') or ''), value=e(thr)) if thr not in (None, '') else ''))
+    lines.append(_('Since {time}', time=when(a.get('triggered_at'))))
     if a.get('acked_at'):
-        lines.append(f"Acknowledged by: {e(a.get('acked_by') or '')}")
+        lines.append(_('Acknowledged by: {user}', user=e(a.get('acked_by') or '')))
     return '\n'.join(lines)
 
 
@@ -134,11 +145,11 @@ def fw_rule_line(r):
     if r.get('proto'):
         parts.append(r['proto'])
     if r.get('source'):
-        parts.append('from ' + r['source'])
+        parts.append(_('from {addr}', addr=r['source']))
     if r.get('dest'):
-        parts.append('to ' + r['dest'])
+        parts.append(_('to {addr}', addr=r['dest']))
     if r.get('dport'):
-        parts.append('port ' + str(r['dport']))
+        parts.append(_('port {port}', port=r['dport']))
     if r.get('iface'):
         parts.append(r['iface'])
     text = ' '.join(str(p) for p in parts if p)

@@ -64,5 +64,6 @@ class Telegram:
     def delete(self, chat_id, message_id):
         return self.call('deleteMessage', chat_id=chat_id, message_id=message_id)
 
-    def set_commands(self, commands):
-        return self.call('setMyCommands', commands=[{'command': c, 'description': d} for c, d in commands])
+    def set_commands(self, commands, language_code=None):
+        return self.call('setMyCommands', commands=[{'command': c, 'description': d} for c, d in commands],
+                         language_code=language_code)

@@ -89,6 +89,9 @@ def test_the_bot_token_is_checked_saved_encrypted_and_never_shown(api, seed, plu
     assert body['status']['bot_username'] == 'my_pp_bot'
 
     assert admin.post(_url('settings/update'), json={'alert_poll': 5}).status_code == 400
+    assert admin.post(_url('settings/update'), json={'language': 'de'}).status_code == 400
+    assert admin.post(_url('settings/update'), json={'language': 'ru'}).status_code == 200
+    assert plugin.load_settings()['language'] == 'ru'
     assert admin.post(_url('settings/update'), json={'allowed_ids': 'abc'}).status_code == 400
     assert admin.post(_url('settings/update'), json={'proxy': 'file:///etc/passwd'}).status_code == 400
     assert admin.post(_url('settings/update'), json={'clear_token': True}).status_code == 200
@@ -132,7 +135,7 @@ class FakeTelegram:
     def answer(self, *a, **k):
         return True
 
-    def set_commands(self, commands):
+    def set_commands(self, commands, language_code=None):
         return True
 
 
@@ -186,7 +189,7 @@ def test_an_admin_can_unlink_an_account(api, seed, plugin):
     plugin.store().link(55, 'pgx_ab12_' + 'x' * 43, {'role': 'user', 'tg_name': 'olga'})
     admin = _admin(api, seed)
     accounts = admin.get(_url('settings')).get_json()['accounts']
-    assert accounts == [{'tg_id': 55, 'tg_name': 'olga', 'role': 'user', 'notify': True}]
+    assert accounts == [{'tg_id': 55, 'tg_name': 'olga', 'role': 'user', 'notify': True, 'lang': ''}]
     assert admin.post(_url('accounts/unlink'), json={'tg_id': 55}).status_code == 200
     assert plugin.store().token(55) is None
     assert admin.post(_url('accounts/unlink'), json={'tg_id': 55}).status_code == 404
