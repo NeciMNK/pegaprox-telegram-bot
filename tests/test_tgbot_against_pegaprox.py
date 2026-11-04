@@ -1,0 +1,65 @@
+# -*- coding: utf-8 -*-
+"""The bot's client against the real PegaProx app: token auth, the CSRF gate on writes,
+and the token owner's permissions deciding what Telegram may do."""
+import pytest
+
+from pegaprox.utils.auth import create_api_token
+from plugins.telegram_bot.pegaprox_client import ApiError, InProcess, PegaProx
+
+
+def _client(api, token):
+    # the transport the plugin uses: straight into the Flask app
+    return PegaProx(token, InProcess(api.app))
+
+
+def _manager(api):
+    m = api.make_fake_manager('c1', vm_action={'success': True, 'data': 'UPID:pve1:00001:start'})
+    m.config.name = 'c1'
+    return api.set_manager('c1', m)
+
+
+def test_the_token_signs_the_bot_in_as_its_owner(api, seed):
+    seed.user('nikita', role='admin')
+    token = create_api_token('nikita', 'telegram')['token']
+    me = _client(api, token).me()
+    assert me['role'] == 'admin' and 'vm.start' in me['permissions']
+
+
+def test_a_guest_action_from_telegram_passes_the_csrf_gate(api, seed):
+    seed.user('nikita', role='admin')
+    token = create_api_token('nikita', 'telegram')['token']
+    m = _manager(api)
+    res = _client(api, token).vm_action('c1', 'pve1', 'qemu', 101, 'start')
+    assert res['data'] == 'UPID:pve1:00001:start'
+    m.vm_action.assert_called_once()
+
+
+def test_a_viewer_token_cannot_start_a_guest_from_telegram(api, seed):
+    seed.user('nikita', role='admin')
+    token = create_api_token('nikita', 'telegram', role='viewer')['token']
+    m = _manager(api)
+    try:
+        _client(api, token).vm_action('c1', 'pve1', 'qemu', 101, 'start')
+        raise AssertionError('a viewer token started a guest')
+    except ApiError as err:
+        assert err.status == 403
+    m.vm_action.assert_not_called()
+
+
+def test_a_revoked_token_is_refused(api, seed):
+    from pegaprox.utils.auth import revoke_api_token
+    seed.user('nikita', role='admin')
+    made = create_api_token('nikita', 'telegram')
+    client = _client(api, made['token'])
+    assert client.me()['role'] == 'admin'
+    assert revoke_api_token(made['token_id'], 'nikita')
+    with pytest.raises(ApiError) as err:
+        client.me()
+    assert err.value.status == 401
+
+
+def test_an_unknown_token_is_refused(api, seed):
+    seed.user('nikita', role='admin')
+    with pytest.raises(ApiError) as err:
+        _client(api, 'pgx_ab12_' + 'z' * 43).me()
+    assert err.value.status == 401
