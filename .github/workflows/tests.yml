@@ -1,0 +1,47 @@
+name: Tests
+
+# The plugin is tested inside a real PegaProx checkout: the bot's calls go through
+# PegaProx's own auth, RBAC and CSRF handling, and the plugin is loaded by PegaProx's
+# plugin loader, as in production.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 4 * * 1'   # weekly, to notice PegaProx changes that break the plugin
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        pegaprox: [main, Testing]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: plugin
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: PegaProx/project-pegaprox
+          ref: ${{ matrix.pegaprox }}
+          path: pegaprox
+          persist-credentials: false
+      - name: Install PegaProx with the plugin
+        run: |
+          cp -r plugin/telegram_bot pegaprox/plugins/
+          cp plugin/tests/*.py pegaprox/tests/
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r pegaprox/requirements.txt -r pegaprox/requirements-dev.txt
+      - name: Run the plugin tests
+        working-directory: pegaprox
+        run: >
+          ../.venv/bin/python -m pytest -q
+          tests/test_tgbot.py tests/test_tgbot_users.py
+          tests/test_tgbot_against_pegaprox.py tests/test_telegram_bot_plugin.py

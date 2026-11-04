@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telegram Bot</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb; --card:#f9fafb;
+          --accent:#2563eb; --ok:#15803d; --bad:#b91c1c; }
+  :root[data-theme="dark"] { --bg:#111827; --fg:#e5e7eb; --muted:#9ca3af; --line:#374151;
+          --card:#1f2937; --accent:#60a5fa; --ok:#4ade80; --bad:#f87171; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg);
+         font:14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  h2 { font-size:15px; margin:24px 0 8px; }
+  p.hint { color:var(--muted); margin:2px 0 0; font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; max-width:760px; }
+  label { display:block; font-weight:600; margin-top:12px; }
+  input { width:100%; padding:7px 9px; margin-top:4px; border:1px solid var(--line); border-radius:6px;
+          background:var(--bg); color:var(--fg); font:inherit; }
+  button { margin-top:14px; margin-right:8px; padding:7px 14px; border-radius:6px; border:1px solid var(--line);
+           background:var(--bg); color:var(--fg); font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  table { border-collapse:collapse; width:100%; max-width:760px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  #msg { margin-top:10px; min-height:1.5em; }
+</style>
+</head>
+<body>
+<h1>Telegram Bot</h1>
+<p class="hint">Each Telegram user links their own PegaProx API token with <code>/login</code> in a private chat with the bot, and acts with that token's permissions.</p>
+
+<h2>Status</h2>
+<div class="card" id="status">Loading…</div>
+
+<h2>Settings</h2>
+<div class="card">
+  <label for="token">Bot token from @BotFather</label>
+  <input id="token" type="password" autocomplete="off" placeholder="123456789:AA...">
+  <p class="hint" id="tokenHint"></p>
+
+  <label for="ids">Allowed Telegram user ids</label>
+  <input id="ids" placeholder="empty: anyone with a PegaProx token may link">
+  <p class="hint">Comma-separated. When set, the bot ignores everyone else.</p>
+
+  <label for="poll">Alert check interval, seconds</label>
+  <input id="poll" type="number" min="0" max="86400">
+  <p class="hint">0 turns alert messages off. Otherwise 15 or more.</p>
+
+  <label for="proxy">Proxy for api.telegram.org</label>
+  <input id="proxy" placeholder="empty, or http://host:port, socks5h://host:port">
+  <p class="hint">Only if this host cannot reach Telegram directly. SOCKS needs the PySocks package.</p>
+
+  <button class="primary" id="save">Save</button>
+  <button id="clear">Remove bot token</button>
+  <div id="msg"></div>
+</div>
+
+<h2>Linked Telegram accounts</h2>
+<div id="accounts">Loading…</div>
+
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  if (params.get('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  var base = location.pathname.replace(/\/ui$/, '/');
+  var $ = function (id) { return document.getElementById(id); };
+
+  function api(path, body) {
+    var opts = { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } };
+    if (body !== undefined) {
+      opts.method = 'POST';
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(base + path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+        return data;
+      });
+    });
+  }
+
+  function say(text, good) {
+    var m = $('msg');
+    m.textContent = text;
+    m.className = good ? 'ok' : 'bad';
+  }
+
+  function line(label, value, cls) {
+    var div = document.createElement('div');
+    var b = document.createElement('b');
+    b.textContent = label + ': ';
+    var span = document.createElement('span');
+    span.textContent = value;
+    if (cls) span.className = cls;
+    div.appendChild(b);
+    div.appendChild(span);
+    return div;
+  }
+
+  function render(s) {
+    var st = $('status');
+    st.textContent = '';
+    st.appendChild(line('Bot', s.status.bot_username ? '@' + s.status.bot_username : (s.token_set ? 'token set' : 'no token yet'),
+                        s.token_set ? 'ok' : 'bad'));
+    st.appendChild(line('Background task', s.status.running ? 'running' : 'stopped', s.status.running ? 'ok' : 'bad'));
+    if (s.status.last_error) st.appendChild(line('Last error', s.status.last_error, 'bad'));
+
+    $('tokenHint').textContent = s.token_set ? 'A token is saved. Leave the field empty to keep it.' : '';
+    $('ids').value = (s.allowed_ids || []).join(', ');
+    $('poll').value = s.alert_poll;
+    $('proxy').value = s.proxy || '';
+
+    var box = $('accounts');
+    box.textContent = '';
+    if (!s.accounts.length) { box.textContent = 'Nobody has linked an account yet.'; return; }
+    var table = document.createElement('table');
+    var head = table.insertRow();
+    ['Telegram id', 'Telegram name', 'PegaProx role', 'Alerts', ''].forEach(function (h) {
+      var th = document.createElement('th'); th.textContent = h; head.appendChild(th);
+    });
+    s.accounts.forEach(function (a) {
+      var row = table.insertRow();
+      [String(a.tg_id), a.tg_name, a.role, a.notify ? 'on' : 'off'].forEach(function (v) {
+        row.insertCell().textContent = v;
+      });
+      var btn = document.createElement('button');
+      btn.textContent = 'Unlink';
+      btn.style.marginTop = '0';
+      btn.onclick = function () {
+        api('accounts/unlink', { tg_id: a.tg_id }).then(load).catch(function (e) { say(e.message, false); });
+      };
+      row.insertCell().appendChild(btn);
+    });
+    box.appendChild(table);
+  }
+
+  function load() {
+    return api('settings').then(render).catch(function (e) {
+      $('status').textContent = e.message;
+      $('accounts').textContent = '';
+    });
+  }
+
+  $('save').onclick = function () {
+    var body = { allowed_ids: $('ids').value, alert_poll: Number($('poll').value || 0), proxy: $('proxy').value };
+    if ($('token').value.trim()) body.bot_token = $('token').value.trim();
+    say('Saving…', true);
+    api('settings/update', body).then(function () {
+      $('token').value = '';
+      say('Saved. The bot picks the change up within half a minute.', true);
+      load();
+    }).catch(function (e) { say(e.message, false); });
+  };
+
+  $('clear').onclick = function () {
+    api('settings/update', { clear_token: true }).then(function () {
+      say('Bot token removed. The bot stops answering.', true);
+      load();
+    }).catch(function (e) { say(e.message, false); });
+  };
+
+  load();
+})();
+</script>
+</body>
+</html>
