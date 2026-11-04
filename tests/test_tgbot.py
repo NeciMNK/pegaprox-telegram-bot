@@ -51,7 +51,7 @@ class FakeTG:
     def answer(self, cid, text=None, alert=False):
         self.answers.append((cid, text))
 
-    def set_commands(self, commands):
+    def set_commands(self, commands, language_code=None):
         pass
 
 
