@@ -247,7 +247,8 @@ class XrayRunner:
     """Owns one xray process. Thread-safe; the bot loop and the settings routes both use it."""
 
     def __init__(self, workdir, port=10810):
-        self.workdir = workdir
+        # PegaProx's CONFIG_DIR can be relative, and xray runs with cwd=workdir
+        self.workdir = os.path.abspath(workdir)
         self.port = port
         self.proc = None
         self.node = None
