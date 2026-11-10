@@ -31,6 +31,9 @@ TLS certificate or extra service to set up.
   settings page.
 - `/api METHOD /api/path [JSON]`: any PegaProx API call when the buttons are not enough
   (private chat only).
+- VPN for Telegram: paste a VPN subscription URL and the plugin reaches Telegram through
+  `xray` with a server from it, downloads the subscription again on a timer and moves to the
+  next server when Telegram stops answering. `/vpn` (admins) shows and switches the server.
 
 ## Install
 
@@ -61,6 +64,10 @@ already ships with.
 | Default language | English | for users who did not pick one with `/lang` |
 | Alert check interval | 60 | seconds between checks for new alerts, `0` turns alert messages off |
 | Proxy | empty | `http://host:port` or `socks5h://host:port` if the host reaches Telegram only through a proxy (SOCKS needs the `PySocks` package) |
+| VPN subscription URL | empty | see [VPN for Telegram](#vpn-for-telegram); stored encrypted, never shown again; when set, Proxy is not used |
+| VPN server | Automatic | a server from the subscription, or the first one that reaches Telegram |
+| Download the subscription again | 6 hours | `0`: only when Telegram stops answering or on the button |
+| Path to xray | empty | found in `/usr/local/bin`, `/usr/bin` or `PATH` |
 
 The settings and the linked accounts live in `<PegaProx config dir>/telegram_bot/` (mode 0700,
 files 0600), not in the plugin folder, so the core's plugin config editor never shows them.
@@ -68,6 +75,52 @@ The page also lists the linked Telegram accounts, and an admin can unlink any of
 
 With PegaProx high availability, the bot runs only on the active instance, like every plugin
 background task. Copy the plugin folder to every instance.
+
+## VPN for Telegram
+
+Where the provider blocks Telegram, the plugin can reach it through a VPN subscription, the
+link a VPN service gives for v2rayN, Hiddify and similar apps (`https://.../sub/...`).
+
+1. Install [xray](https://github.com/XTLS/Xray-core) on the PegaProx host, for example:
+   ```bash
+   bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+   systemctl disable --now xray   # the plugin runs its own xray, the system service is not needed
+   ```
+2. On the plugin's page, under **VPN for Telegram**, paste the subscription URL and press
+   **Save VPN**. The plugin checks the subscription before it saves it.
+
+The plugin then runs xray as the PegaProx user (no root), with an HTTP proxy on
+`127.0.0.1` only, and sends the bot's Telegram traffic through it. The subscription itself is
+downloaded directly. Supported servers: VLESS (TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade; TLS or
+Reality), VMess, Trojan and Shadowsocks. Hysteria2 servers are listed but skipped.
+
+- When the VPN provider changes servers or keys, the next download picks them up: every
+  6 hours by default, at once with **Download again and reconnect**, or with `/vpn`.
+- When Telegram stops answering for about half a minute, the plugin downloads the
+  subscription again and tries the next server, at most once every two minutes.
+- `/vpn` in the bot (PegaProx admins only) shows the server and whether Telegram is
+  reachable, switches to another server, and downloads the subscription again. The URL
+  itself can only be changed on the settings page, never in a chat.
+- xray's config and log are in `<PegaProx config dir>/telegram_bot/vpn/` (mode 0700).
+
+## Updating
+
+PegaProx has no plugin store: an update replaces the plugin folder, and **Reload** next to
+the plugin (Settings → Server → Plugins) starts the new code without restarting PegaProx.
+The settings and linked accounts are kept, since they live in the PegaProx config directory.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NeciMNK/pegaprox-telegram-bot/main/update.sh | sudo sh
+```
+
+`update.sh` installs the latest release (or `sudo sh update.sh v1.2.0`, or `main`) and keeps
+the previous folder as `telegram_bot.bak`. Releases are on the
+[Releases page](https://github.com/NeciMNK/pegaprox-telegram-bot/releases), with
+`telegram_bot.zip` for a manual copy.
+
+To publish a release: raise `version` in `telegram_bot/manifest.json`, add it to the change
+log below, merge, and push a tag `v<version>`. GitHub Actions checks that the tag matches the
+manifest and publishes the release.
 
 ## Linking an account
 
@@ -107,10 +160,28 @@ git clone -b Testing https://github.com/PegaProx/project-pegaprox.git pegaprox
 cp -r telegram_bot pegaprox/plugins/
 cp tests/*.py pegaprox/tests/
 cd pegaprox && pip install -r requirements.txt -r requirements-dev.txt
-python -m pytest tests/test_tgbot.py tests/test_tgbot_users.py tests/test_tgbot_against_pegaprox.py tests/test_telegram_bot_plugin.py tests/test_telegram_bot_lang.py
+python -m pytest tests/test_tgbot.py tests/test_tgbot_users.py tests/test_tgbot_against_pegaprox.py tests/test_telegram_bot_plugin.py tests/test_telegram_bot_lang.py tests/test_telegram_bot_vpn.py
 ```
 
 GitHub Actions does the same on every push (`.github/workflows/tests.yml`).
+
+## Changes
+
+### 1.2.0
+
+- VPN for Telegram: a VPN subscription URL on the settings page; the plugin runs xray with a
+  server from it, downloads it again on a timer, and moves to the next server when Telegram
+  stops answering.
+- `/vpn` for PegaProx admins: the server in use, switching servers, downloading again.
+- `update.sh` and GitHub releases for updating the plugin.
+
+### 1.1.0
+
+- Russian translation (`/lang`).
+
+### 1.0.0
+
+- First release as a PegaProx plugin.
 
 ## License and credits
 

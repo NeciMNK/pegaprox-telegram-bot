@@ -12,6 +12,7 @@ class Telegram:
     def __init__(self, token, session=None, base='https://api.telegram.org', proxy=None):
         self.url = f'{base}/bot{token}/'
         self.http = session or requests.Session()
+        self.failures = 0  # calls in a row that did not reach Telegram (the VPN watchdog reads it)
         if proxy:  # for hosts that reach api.telegram.org only through a proxy
             self.http.proxies = {'http': proxy, 'https': proxy}
 
@@ -26,7 +27,9 @@ class Telegram:
             data = r.json()
         except (requests.RequestException, ValueError) as e:
             log.warning('Telegram %s failed: %s', method, e.__class__.__name__)
+            self.failures += 1
             return None, e.__class__.__name__
+        self.failures = 0
         if not data.get('ok'):
             desc = data.get('description') or ''
             if 'message is not modified' not in desc:

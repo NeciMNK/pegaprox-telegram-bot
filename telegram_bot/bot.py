@@ -20,6 +20,7 @@ from . import views as v
 from .i18n import LANGUAGES, _, use
 from .pegaprox_client import ApiError
 from .panel_users import PanelUsersMixin
+from .vpn_bot import VpnMixin
 
 log = logging.getLogger('plugin.telegram_bot')
 
@@ -62,7 +63,7 @@ HELP = (
 COMMANDS = [
     ('menu', 'Main menu'), ('find', 'Find a VM/CT'), ('users', 'PegaProx users'), ('alerts', 'Active alerts'),
     ('notify', 'Notifications on/off'), ('lang', 'Language'), ('whoami', 'My permissions'), ('login', 'Link an account'),
-    ('logout', 'Unlink the account'), ('api', 'API request'), ('help', 'Help'),
+    ('logout', 'Unlink the account'), ('api', 'API request'), ('vpn', 'VPN for Telegram'), ('help', 'Help'),
 ]
 
 
@@ -100,7 +101,7 @@ class Callbacks:
             return self._items.get(key)
 
 
-class Bot(PanelUsersMixin):
+class Bot(PanelUsersMixin, VpnMixin):
     def __init__(self, cfg, tg, store, api_factory=None):
         self.cfg = cfg
         self.tg = tg

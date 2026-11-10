@@ -62,6 +62,35 @@
   <div id="msg"></div>
 </div>
 
+<h2>VPN for Telegram</h2>
+<div class="card">
+  <p class="hint">If this host cannot reach Telegram, paste a VPN subscription URL (the one your VPN service gives
+    for v2rayN, Hiddify and the like). The plugin runs <code>xray</code> with a server from it, downloads the
+    subscription again on a timer, and moves to the next server when Telegram stops answering. When a
+    subscription is set, the Proxy field above is not used.</p>
+  <div id="vpnStatus" style="margin-top:10px"></div>
+
+  <label for="vpnUrl">Subscription URL</label>
+  <input id="vpnUrl" type="password" autocomplete="off" placeholder="https://...">
+  <p class="hint" id="vpnUrlHint"></p>
+
+  <label for="vpnServer">Server</label>
+  <select id="vpnServer"></select>
+  <p class="hint">Automatic: the first server in the subscription that reaches Telegram.</p>
+
+  <label for="vpnHours">Download the subscription again every, hours</label>
+  <input id="vpnHours" type="number" min="0" max="168">
+  <p class="hint">0: only when Telegram stops answering or on the button below.</p>
+
+  <label for="xrayBin">Path to xray</label>
+  <input id="xrayBin" placeholder="empty: look in /usr/local/bin and PATH">
+
+  <button class="primary" id="vpnSave">Save VPN</button>
+  <button id="vpnRefresh">Download again and reconnect</button>
+  <button id="vpnClear">Remove subscription</button>
+  <div id="vpnMsg"></div>
+</div>
+
 <h2>Linked Telegram accounts</h2>
 <div id="accounts">Loading…</div>
 
@@ -87,10 +116,50 @@
     });
   }
 
-  function say(text, good) {
-    var m = $('msg');
+  function say(text, good, id) {
+    var m = $(id || 'msg');
     m.textContent = text;
     m.className = good ? 'ok' : 'bad';
+  }
+
+  function renderVpn(vpn) {
+    var st = $('vpnStatus');
+    st.textContent = '';
+    if (!vpn.configured) {
+      st.appendChild(line('VPN', 'off'));
+    } else {
+      st.appendChild(line('Server', vpn.current ? vpn.current.name + ' (' + vpn.current.host + ':' + vpn.current.port +
+                          ', ' + vpn.current.transport + ')' : 'none running', vpn.current ? 'ok' : 'bad'));
+      st.appendChild(line('Telegram through the VPN', vpn.telegram_ok ? 'reachable' : 'not reachable',
+                          vpn.telegram_ok ? 'ok' : 'bad'));
+      if (vpn.last_refresh) st.appendChild(line('Subscription downloaded', vpn.last_refresh));
+    }
+    if (!vpn.xray_bin) st.appendChild(line('xray', 'not found on this host', 'bad'));
+    if (vpn.last_error) st.appendChild(line('Last error', vpn.last_error, 'bad'));
+    $('vpnUrlHint').textContent = vpn.configured ? 'A subscription is saved. Leave the field empty to keep it.' : '';
+    $('vpnHours').value = vpn.refresh_hours;
+    $('xrayBin').placeholder = vpn.xray_bin ? 'found: ' + vpn.xray_bin : 'empty: look in /usr/local/bin and PATH';
+    var sel = $('vpnServer');
+    sel.textContent = '';
+    var auto = document.createElement('option');
+    auto.value = '';
+    auto.textContent = 'Automatic';
+    sel.appendChild(auto);
+    (vpn.servers || []).forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = n.name;
+      o.textContent = n.name + ' (' + n.scheme + (n.transport ? ', ' + n.transport : '') + ')' +
+                      (n.supported ? '' : ': not supported');
+      o.disabled = !n.supported;
+      sel.appendChild(o);
+    });
+    if (vpn.preferred && !(vpn.servers || []).some(function (n) { return n.name === vpn.preferred; })) {
+      var keep = document.createElement('option');
+      keep.value = vpn.preferred;
+      keep.textContent = vpn.preferred;
+      sel.appendChild(keep);
+    }
+    sel.value = vpn.preferred || '';
   }
 
   function line(label, value, cls) {
@@ -126,6 +195,7 @@
       sel.appendChild(o);
     });
     sel.value = s.language || 'en';
+    if (s.vpn) renderVpn(s.vpn);
 
     var box = $('accounts');
     box.textContent = '';
@@ -175,6 +245,35 @@
       say('Bot token removed. The bot stops answering.', true);
       load();
     }).catch(function (e) { say(e.message, false); });
+  };
+
+  $('vpnSave').onclick = function () {
+    var body = { vpn_server: $('vpnServer').value, vpn_refresh_hours: Number($('vpnHours').value || 0),
+                 xray_bin: $('xrayBin').value };
+    if ($('vpnUrl').value.trim()) body.vpn_url = $('vpnUrl').value.trim();
+    say(body.vpn_url ? 'Checking the subscription…' : 'Saving…', true, 'vpnMsg');
+    api('settings/update', body).then(function () {
+      $('vpnUrl').value = '';
+      say('Saved. Connecting takes a few seconds.', true, 'vpnMsg');
+      load();
+      setTimeout(load, 8000);
+    }).catch(function (e) { say(e.message, false, 'vpnMsg'); });
+  };
+
+  $('vpnRefresh').onclick = function () {
+    say('Downloading the subscription and checking Telegram…', true, 'vpnMsg');
+    api('vpn/refresh', {}).then(function (r) {
+      say(r.success ? 'Connected, Telegram is reachable.'
+                    : 'Telegram is not reachable through any server, see the error above.', r.success, 'vpnMsg');
+      load();
+    }).catch(function (e) { say(e.message, false, 'vpnMsg'); });
+  };
+
+  $('vpnClear').onclick = function () {
+    api('settings/update', { clear_vpn: true }).then(function () {
+      say('Subscription removed. The bot goes back to the Proxy setting.', true, 'vpnMsg');
+      load();
+    }).catch(function (e) { say(e.message, false, 'vpnMsg'); });
   };
 
   load();
