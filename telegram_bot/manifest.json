@@ -1,7 +1,7 @@
 {
     "id": "telegram_bot",
     "name": "Telegram Bot",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "author": "NeciMNK (community)",
     "description": "Manage clusters, VMs/CTs, snapshots, backups, firewall, alerts and PegaProx users from Telegram. Each Telegram user links their own API token and acts with their own permissions.",
     "min_pegaprox": "1.4.1",

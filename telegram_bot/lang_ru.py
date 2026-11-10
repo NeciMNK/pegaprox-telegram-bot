@@ -46,6 +46,7 @@ RU = {
     'Unlink the account': 'Отвязать аккаунт',
     'API request': 'Запрос к API',
     'Help': 'Справка',
+    'VPN for Telegram': 'VPN для Telegram',
     'Choose the language:': 'Выберите язык:',
     'Language: English': 'Язык: русский',
 
@@ -298,4 +299,19 @@ RU = {
     'from {addr}': 'от {addr}',
     'to {addr}': 'к {addr}',
     'port {port}': 'порт {port}',
+
+    # VPN (/vpn)
+    "Only a PegaProx admin can manage the bot's VPN.": 'Управлять VPN бота может только администратор PegaProx.',
+    'The VPN is not available here.': 'VPN здесь недоступен.',
+    "No VPN subscription is set. Paste its URL on the plugin's settings page in PegaProx (Telegram Bot tab).":
+        'Подписка VPN не задана. Вставьте её URL на странице настроек плагина в PegaProx (вкладка Telegram Bot).',
+    '<b>VPN for Telegram</b>': '<b>VPN для Telegram</b>',
+    'Server: <b>{name}</b> ({host}:{port}, {transport})': 'Сервер: <b>{name}</b> ({host}:{port}, {transport})',
+    'Server: none running': 'Сервер: не запущен',
+    'Telegram reachable: {ok}': 'Telegram доступен: {ok}',
+    'Subscription downloaded: {when}': 'Подписка скачана: {when}',
+    'Last error: {error}': 'Последняя ошибка: {error}',
+    '🔄 Download the subscription again': '🔄 Скачать подписку заново',
+    'Switching to {name}…': 'Переключаюсь на {name}…',
+    'Downloading the subscription…': 'Скачиваю подписку…',
 }

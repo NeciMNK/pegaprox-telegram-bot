@@ -13,6 +13,7 @@ import plugins.telegram_bot.bot as botmod
 from plugins.telegram_bot import i18n
 from plugins.telegram_bot.lang_ru import RU
 from plugins.telegram_bot.panel_users import HINT
+from plugins.telegram_bot.vpn_bot import ADMIN_ONLY
 
 PKG = os.path.dirname(botmod.__file__)
 
@@ -31,7 +32,7 @@ def _keys_in_code():
                     and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
                 keys.add(node.args[0].value)
     # texts kept in constants and passed to _() by name
-    keys |= {botmod.HELP, botmod.PRIVATE_ONLY, botmod.RULES_MOVED, HINT}
+    keys |= {botmod.HELP, botmod.PRIVATE_ONLY, botmod.RULES_MOVED, HINT, ADMIN_ONLY}
     for label, _confirm, word in botmod.GUEST_ACTIONS.values():
         keys |= {label, word}
     keys |= {d for _c, d in botmod.COMMANDS}

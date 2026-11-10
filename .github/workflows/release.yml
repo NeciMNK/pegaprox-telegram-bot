@@ -1,0 +1,41 @@
+name: Release
+
+# Push a tag like v1.2.0 (the same version as telegram_bot/manifest.json) to publish a
+# GitHub release with telegram_bot.zip, the folder to drop into the PegaProx plugins dir.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check the version
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have=$(python3 -c 'import json; print(json.load(open("telegram_bot/manifest.json"))["version"])')
+          if [ "$want" != "$have" ]; then
+            echo "Tag $GITHUB_REF_NAME but manifest.json says $have" >&2
+            exit 1
+          fi
+      - name: Build the archive
+        run: |
+          find telegram_bot -name '__pycache__' -prune -exec rm -rf {} +
+          zip -r telegram_bot.zip telegram_bot
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes=$(awk -v v="${GITHUB_REF_NAME#v}" '
+            $0 ~ "^### " v "( |$)" {on=1; next}
+            on && /^### / {exit}
+            on {print}' README.md)
+          gh release create "$GITHUB_REF_NAME" telegram_bot.zip update.sh \
+            --title "Telegram Bot $GITHUB_REF_NAME" --notes "${notes:-See README.md}"
