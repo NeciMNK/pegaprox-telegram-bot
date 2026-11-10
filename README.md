@@ -114,7 +114,7 @@ curl -fsSL https://raw.githubusercontent.com/NeciMNK/pegaprox-telegram-bot/main/
 ```
 
 `update.sh` installs the latest release (or `sudo sh update.sh v1.2.0`, or `main`) and keeps
-the previous folder as `telegram_bot.bak`. Releases are on the
+the previous folder as `.telegram_bot.bak`. Releases are on the
 [Releases page](https://github.com/NeciMNK/pegaprox-telegram-bot/releases), with
 `telegram_bot.zip` for a manual copy.
 
@@ -166,6 +166,13 @@ python -m pytest tests/test_tgbot.py tests/test_tgbot_users.py tests/test_tgbot_
 GitHub Actions does the same on every push (`.github/workflows/tests.yml`).
 
 ## Changes
+
+### 1.2.1
+
+- The VPN's xray did not start when PegaProx's config directory is a relative path (the
+  standard install): xray looked for its config relative to its own folder.
+- `update.sh` keeps the previous copy as `.telegram_bot.bak`, which PegaProx does not list
+  as a plugin.
 
 ### 1.2.0
 

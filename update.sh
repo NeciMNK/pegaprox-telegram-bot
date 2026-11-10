@@ -6,7 +6,8 @@
 #   sudo sh update.sh main       # the main branch
 #
 # The settings and the linked accounts live in the PegaProx config directory, not in the
-# plugin folder, so an update keeps them. The old folder is kept as telegram_bot.bak.
+# plugin folder, so an update keeps them. The old folder is kept as .telegram_bot.bak
+# (hidden: PegaProx skips folders starting with a dot, so it is not listed as a plugin).
 # Afterwards press Reload next to the plugin in Settings -> Server -> Plugins (no restart).
 set -eu
 
@@ -35,13 +36,15 @@ SRC=$(find "$TMP" -mindepth 2 -maxdepth 2 -type d -name telegram_bot | head -n1)
 
 OWNER=$(stat -c %U:%G "$PLUGINS_DIR")
 DEST="$PLUGINS_DIR/telegram_bot"
+BAK="$PLUGINS_DIR/.telegram_bot.bak"
+rm -rf "$PLUGINS_DIR/telegram_bot.bak"  # left by update.sh 1.2.0, PegaProx listed it as a plugin
 if [ -d "$DEST" ]; then
-    rm -rf "$DEST.bak"
-    mv "$DEST" "$DEST.bak"
+    rm -rf "$BAK"
+    mv "$DEST" "$BAK"
 fi
 cp -r "$SRC" "$DEST"
 chown -R "$OWNER" "$DEST"
 
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$DEST/manifest.json")
-echo "Installed Telegram Bot $VERSION into $DEST (the previous copy is in $DEST.bak)."
+echo "Installed Telegram Bot $VERSION into $DEST (the previous copy is in $BAK)."
 echo "Now press Reload next to Telegram Bot in PegaProx: Settings -> Server -> Plugins."

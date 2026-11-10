@@ -99,6 +99,12 @@ def test_the_config_listens_only_on_localhost():
     assert cfg['inbounds'] == [{'tag': 'http', 'listen': '127.0.0.1', 'port': 10810, 'protocol': 'http'}]
 
 
+def test_the_xray_folder_is_absolute(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner = vpn.XrayRunner(os.path.join('config', 'telegram_bot', 'vpn'))
+    assert runner.workdir == str(tmp_path / 'config' / 'telegram_bot' / 'vpn')
+
+
 @pytest.mark.skipif(not vpn.find_xray(), reason='xray is not installed here')
 def test_xray_accepts_every_config(tmp_path):
     for n in vpn.pick(nodes()):
